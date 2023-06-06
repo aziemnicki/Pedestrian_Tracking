@@ -135,109 +135,114 @@ def main():
             cv.rectangle(image, (int(x), int(y)), (int(x)+int(w), int(y)+int(h)), (0, 255, 0), 2)
             hist.append(calculate_histogram(image, box))            # Histogram aktualnej klatki
 
+
+        matching_indices = []  # Indeksy dopasowanych elementów w macierzy
+
         if first_frame:
             # initialize previous detections and histograms
             detection_prev = detection[0].Bbox
             hist_prev.append(calculate_histogram(image, detection[0].Bbox[0]))
             img_prev = image
             first_frame = False
-            continue
+            matching_indices = [-1]
+            print(" ".join(map(str, matching_indices)) + "\n")  # Wyświetlenie końcowego wyniku w poprawnym formacie
 
-        for box_p in detection_prev:
-            iou.append(bb_intersection_over_union(box_p, box))      # IoU między 2 klatkami
+        else:
 
-            if len(hist_prev) < len(hist):          #TODO sprawdzić ilość w liście
-                hist_prev = hist.copy()
-            else:
-                hist_prev = hist_prev[:len(hist)]
+            for box_p in detection_prev:
+                iou.append(bb_intersection_over_union(box_p, box))      # IoU między 2 klatkami
 
-            for i in range(len(hist)):
-                result = cv.compareHist(hist_prev[i], hist[i], cv.HISTCMP_CORREL)
-                results.append(result)
-            hist_prev.append(calculate_histogram(img_prev, box_p))  # Histogram poprzedniej klatki
-
-        #print(hist)
-        #print(hist_prev)
-        #print(results)
-        #
-        # nodes = []  # bounding boxy
-        # for prev in range(len(images_paths)):
-        #     for now in range(len(images_paths)):
-        #         nodes.append('x_' + str(prev) + '_' + str(now))
-        #
-        #
-        # factors_p = []  # prawdopodobieństwo z porównania histogramów
-        # edges_p = []  # Krawędzie między node ami
-        # for prev in range(len(detection_prev)):
-        #     for now in range(len(detection[0].Bbox)):
-        #         cur_f_r = create_factor(['x_' + str(prev) + '_' + str(now), 'x_' + str(prev + 1) + '_' + str(now)],
-        #                                 [[0, 1], [0, 1]],
-        #                                 [0.5],
-        #                                 [pairwise_feat],
-        #                                 None)
-        #         factors_p.append(cur_f_r)
-        #         edges_p.append(('x_' + str(prev) + '_' + str(now), 'x_' + str(prev + 1) + '_' + str(now)))
-        #
-        #
-
-        # factors_u = []
-        # for r in range(detection[0].num):
-        #         cur_f = create_factor(['x_' + str(r) + '_'],
-        #                               [[0, 1]],
-        #                               [1.0],
-        #                               [pairwise_feat],
-        #                               intensity[r, c])
-        #         factors_u.append(cur_f)
-        #
-        #
-        #
-        #
-        # G = MarkovModel()
-        # G.add_nodes_from(nodes)
-        # print('Adding factors_u')
-        # G.add_factors(*factors_u)
-        # print('Adding factors_p')
-        # G.add_factors(*factors_p)
-        # print('Adding edges')
-        # G.add_edges_from(edges_p)
-
-        # checking if everthing is ok
-        # print('Check model :', G.check_model())
-        #
-        # # initialize inference algorithm
-        # denoise_infer = Mplp(G)
-        #
-        # # inferring MAP assignment
-        # q = denoise_infer.map_query()
-
-        #print(len(detection[0].Bbox))
-        #print(len(detection_prev))
-
-        for i, now in enumerate(detection[0].Bbox):
-            for j, prev in enumerate(detection_prev):
-                print(now)
-                if j < len(hist_prev) and i < len(hist):
-                    result = cv.compareHist(hist_prev[j], hist[i], cv.HISTCMP_CORREL)
-
+                if len(hist_prev) < len(hist):          #TODO sprawdzić ilość w liście
+                    hist_prev = hist.copy()
                 else:
-                    result = 0
-                matrix[i, j] = result
+                    hist_prev = hist_prev[:len(hist)]
 
-        matching_indices = []  # Indeksy dopasowanych elementów w macierzy
-        for i in range(len(matrix)):
-            row = matrix[i]
-            max_value = max(row)  # Znajdowanie największej wartości w wierszu
-            max_index = np.where(row == max_value)[0][0]  # Indeks największej wartości
-            if max_value < 0.6:
-                max_index = -1
-            matching_indices.append(max_index)
+                for i in range(len(hist)):
+                    result = cv.compareHist(hist_prev[i], hist[i], cv.HISTCMP_CORREL)
+                    results.append(result)
+                hist_prev.append(calculate_histogram(img_prev, box_p))  # Histogram poprzedniej klatki
+
+            #print(hist)
+            #print(hist_prev)
+            #print(results)
+            #
+            # nodes = []  # bounding boxy
+            # for prev in range(len(images_paths)):
+            #     for now in range(len(images_paths)):
+            #         nodes.append('x_' + str(prev) + '_' + str(now))
+            #
+            #
+            # factors_p = []  # prawdopodobieństwo z porównania histogramów
+            # edges_p = []  # Krawędzie między node ami
+            # for prev in range(len(detection_prev)):
+            #     for now in range(len(detection[0].Bbox)):
+            #         cur_f_r = create_factor(['x_' + str(prev) + '_' + str(now), 'x_' + str(prev + 1) + '_' + str(now)],
+            #                                 [[0, 1], [0, 1]],
+            #                                 [0.5],
+            #                                 [pairwise_feat],
+            #                                 None)
+            #         factors_p.append(cur_f_r)
+            #         edges_p.append(('x_' + str(prev) + '_' + str(now), 'x_' + str(prev + 1) + '_' + str(now)))
+            #
+            #
+
+            # factors_u = []
+            # for r in range(detection[0].num):
+            #         cur_f = create_factor(['x_' + str(r) + '_'],
+            #                               [[0, 1]],
+            #                               [1.0],
+            #                               [pairwise_feat],
+            #                               intensity[r, c])
+            #         factors_u.append(cur_f)
+            #
+            #
+            #
+            #
+            # G = MarkovModel()
+            # G.add_nodes_from(nodes)
+            # print('Adding factors_u')
+            # G.add_factors(*factors_u)
+            # print('Adding factors_p')
+            # G.add_factors(*factors_p)
+            # print('Adding edges')
+            # G.add_edges_from(edges_p)
+
+            # checking if everthing is ok
+            # print('Check model :', G.check_model())
+            #
+            # # initialize inference algorithm
+            # denoise_infer = Mplp(G)
+            #
+            # # inferring MAP assignment
+            # q = denoise_infer.map_query()
+
+            #print(len(detection[0].Bbox))
+            #print(len(detection_prev))
+
+            for i, now in enumerate(detection[0].Bbox):
+                for j, prev in enumerate(detection_prev):
+                    print(now)
+                    if j < len(hist_prev) and i < len(hist):
+                        result = cv.compareHist(hist_prev[j], hist[i], cv.HISTCMP_CORREL)
+
+                    else:
+                        result = 0
+                    matrix[i, j] = result
+
+            for i in range(len(matrix)):
+                row = matrix[i]
+                max_value = max(row)  # Znajdowanie największej wartości w wierszu
+                max_index = np.where(row == max_value)[0][0]  # Indeks największej wartości
+                if max_value < 0.65:
+                    max_index = -1
+                matching_indices.append(max_index)
 
 
 
-        print("MATRIX")
-        print(matrix)
-        print(image_path)
-        print(" ".join(map(str, matching_indices))+"\n")        # Wyświetlenie końcowego wyniku w poprawnym formacie
+            print("MATRIX")
+            print(matrix)
+            print(image_path)
+            print(" ".join(map(str, matching_indices))+"\n")        # Wyświetlenie końcowego wyniku w poprawnym formacie
 
         cv.imshow('image', image)
         key = cv.waitKey(0)
