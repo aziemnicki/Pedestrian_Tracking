@@ -128,6 +128,7 @@ def main():
         results = []
         # print(detection)
         iou = []
+        matrix = - np.ones((len(detection[0].Bbox),len(detection_prev)))
         for box in detection[0].Bbox:
             x, y, w, h = box[0], box[1], box[2], box[3]
             # print(x, y, w, h)
@@ -157,27 +158,27 @@ def main():
 
         #print(hist)
         #print(hist_prev)
-        print(results)
-
-        nodes = []  # bounding boxy
-        for prev in range(len(images_paths)):
-            for now in range(len(images_paths)):
-                nodes.append('x_' + str(prev) + '_' + str(now))
-
-
-        factors_p = []  # prawdopodobieństwo z porównania histogramów
-        edges_p = []  # Krawędzie między node ami
-        for prev in range(len(detection_prev)):
-            for now in range(len(detection[0].Bbox)):
-                cur_f_r = create_factor(['x_' + str(prev) + '_' + str(now), 'x_' + str(prev + 1) + '_' + str(now)],
-                                        [[0, 1], [0, 1]],
-                                        [0.5],
-                                        [pairwise_feat],
-                                        None)
-                factors_p.append(cur_f_r)
-                edges_p.append(('x_' + str(prev) + '_' + str(now), 'x_' + str(prev + 1) + '_' + str(now)))
-
-
+        #print(results)
+        #
+        # nodes = []  # bounding boxy
+        # for prev in range(len(images_paths)):
+        #     for now in range(len(images_paths)):
+        #         nodes.append('x_' + str(prev) + '_' + str(now))
+        #
+        #
+        # factors_p = []  # prawdopodobieństwo z porównania histogramów
+        # edges_p = []  # Krawędzie między node ami
+        # for prev in range(len(detection_prev)):
+        #     for now in range(len(detection[0].Bbox)):
+        #         cur_f_r = create_factor(['x_' + str(prev) + '_' + str(now), 'x_' + str(prev + 1) + '_' + str(now)],
+        #                                 [[0, 1], [0, 1]],
+        #                                 [0.5],
+        #                                 [pairwise_feat],
+        #                                 None)
+        #         factors_p.append(cur_f_r)
+        #         edges_p.append(('x_' + str(prev) + '_' + str(now), 'x_' + str(prev + 1) + '_' + str(now)))
+        #
+        #
 
         # factors_u = []
         # for r in range(detection[0].num):
@@ -208,6 +209,35 @@ def main():
         #
         # # inferring MAP assignment
         # q = denoise_infer.map_query()
+
+        #print(len(detection[0].Bbox))
+        #print(len(detection_prev))
+
+        for i, now in enumerate(detection[0].Bbox):
+            for j, prev in enumerate(detection_prev):
+                print(now)
+                if j < len(hist_prev) and i < len(hist):
+                    result = cv.compareHist(hist_prev[j], hist[i], cv.HISTCMP_CORREL)
+
+                else:
+                    result = 0
+                matrix[i, j] = result
+
+        matching_indices = []  # Indeksy dopasowanych elementów w macierzy
+        for i in range(len(matrix)):
+            row = matrix[i]
+            max_value = max(row)  # Znajdowanie największej wartości w wierszu
+            max_index = np.where(row == max_value)[0][0]  # Indeks największej wartości
+            if max_value < 0.6:
+                max_index = -1
+            matching_indices.append(max_index)
+
+
+
+        print("MATRIX")
+        print(matrix)
+        print(image_path)
+        print(" ".join(map(str, matching_indices))+"\n")        # Wyświetlenie końcowego wyniku w poprawnym formacie
 
         cv.imshow('image', image)
         key = cv.waitKey(0)
