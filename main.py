@@ -128,10 +128,14 @@ def main():
         results = []
         # print(detection)
         iou = []
-        matrix = - np.ones((len(detection[0].Bbox),len(detection_prev)))
+        center = []
+        center_prev = []
+        distance = []
+        matrix = - np.ones((len(detection[0].Bbox), len(detection_prev)))
         for box in detection[0].Bbox:
             x, y, w, h = box[0], box[1], box[2], box[3]
             # print(x, y, w, h)
+            center.append([x+0.5*w, y+0.5*h])
             cv.rectangle(image, (int(x), int(y)), (int(x)+int(w), int(y)+int(h)), (0, 255, 0), 2)
             hist.append(calculate_histogram(image, box))            # Histogram aktualnej klatki
 
@@ -150,17 +154,10 @@ def main():
         else:
 
             for box_p in detection_prev:
+                xx, yy, ww, hh = box_p[0], box_p[1], box_p[2], box_p[3]
                 iou.append(bb_intersection_over_union(box_p, box))      # IoU między 2 klatkami
-
-                if len(hist_prev) < len(hist):          #TODO sprawdzić ilość w liście
-                    hist_prev = hist.copy()
-                else:
-                    hist_prev = hist_prev[:len(hist)]
-
-                for i in range(len(hist)):
-                    result = cv.compareHist(hist_prev[i], hist[i], cv.HISTCMP_CORREL)
-                    results.append(result)
                 hist_prev.append(calculate_histogram(img_prev, box_p))  # Histogram poprzedniej klatki
+                center_prev.append([xx+0.5*ww, yy+0.5*hh])
 
             #print(hist)
             #print(hist_prev)
@@ -224,16 +221,18 @@ def main():
                     print(now)
                     if j < len(hist_prev) and i < len(hist):
                         result = cv.compareHist(hist_prev[j], hist[i], cv.HISTCMP_CORREL)
+                        distance.append(np.sqrt((center_prev[j][0]-center[i][0])**2 + (center_prev[j][0]-center[i][1])**2))
+                        print(distance)
 
                     else:
-                        result = 0
+                        result = -1
                     matrix[i, j] = result
 
             for i in range(len(matrix)):
                 row = matrix[i]
                 max_value = max(row)  # Znajdowanie największej wartości w wierszu
                 max_index = np.where(row == max_value)[0][0]  # Indeks największej wartości
-                if max_value < 0.65:
+                if max_value < 0.65 or distance[i] > 500:
                     max_index = -1
                 matching_indices.append(max_index)
 
