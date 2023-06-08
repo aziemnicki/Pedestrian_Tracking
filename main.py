@@ -12,6 +12,7 @@ from pathlib import Path
 
 Detection = namedtuple("Detection", ["image_path", "num", "Bbox"])
 
+
 # metoda działa jedynie dla Bboxów blisko siebie
 def bb_intersection_over_union(bbox1, bbox2):
     # determine the (x, y)-coordinates of the intersection rectangle
@@ -37,6 +38,10 @@ def bb_intersection_over_union(bbox1, bbox2):
     return iou
 
 
+def description(bbox1, bbox2):
+    pass
+
+
 def calculate_histogram(image, bbox):
     # Wyciągnij obszar z obrazu na podstawie bounding boxa
     x, y, w, h = map(int, bbox)
@@ -52,6 +57,7 @@ def calculate_histogram(image, bbox):
     cv.normalize(hist, hist, 0, 255, cv.NORM_MINMAX)
 
     return hist.flatten()
+
 
 def load_bboxes(image_dir, image_path):
     detections = []
@@ -75,6 +81,26 @@ def load_bboxes(image_dir, image_path):
                 line_index += 1
     return detections
 
+
+def load_gt(image_dir, image_path):
+    with open("bboxes_gt.txt", "r") as file:
+        lines = file.readlines()
+        line_index = 0
+        while line_index < len(lines):
+            current_image_name = lines[line_index].strip()
+            curr_image_dir = os.path.join(image_dir, current_image_name)
+            if str(curr_image_dir) == str(image_path):
+                GT = []
+                num = int(lines[line_index + 1])  # number of Bboxes
+                for i in range(num):
+                    value = lines[line_index+2].split()
+                    GT.append(int(value[0]))
+                    line_index += 1
+            else:
+                line_index += 1
+    return GT
+
+
 def create_factor(var_names, var_vals, params, feats, obs):
 
     # shape of the values array
@@ -96,6 +122,7 @@ def create_factor(var_names, var_vals, params, feats, obs):
 
     return DiscreteFactor(var_names, f_vals_shape, f_vals)
 
+
 def pairwise_feat(xi, xj, obs):
     # 1 if the same, 0 otherwise
     if xi == xj:
@@ -103,6 +130,7 @@ def pairwise_feat(xi, xj, obs):
     else:
         val = 0
     return val
+
 
 def main():
 
@@ -115,6 +143,9 @@ def main():
     hist_prev = []
     hist = []
     first_frame = True
+    all_bbox = 0
+    correct = 0
+
     for image_path in images_paths:
 
         image = cv.imread(str(image_path))
@@ -234,24 +265,31 @@ def main():
                 max_index = np.where(row == max_value)[0][0]  # Indeks największej wartości
                 if max_value < 0.65 or distance[i] > 500:
                     max_index = -1
-                matching_indices.append(max_index)
+                matching_indices.append(max_index)              # Wartości wyjściowe poszczególnych Bboxów
 
+            gt = load_gt(images_dir, image_path)                # Metryka poprawnych dopasowań
+            all_bbox += len(gt)
+            for i in range(len(matching_indices)):
+                print(f'gti{gt[i]}, matching_i {matching_indices[i]}')
+                if gt[i] == matching_indices[i]:
+                    correct += 1
 
 
             print("MATRIX")
-            print(matrix)
-            print(image_path)
+            #print(matrix)
+            #print(image_path)
+            print(f'GT: {gt}, ALL: {all_bbox}, CORRECT: {correct}')
             print(" ".join(map(str, matching_indices))+"\n")        # Wyświetlenie końcowego wyniku w poprawnym formacie
+            print(f'Correct percentage: {correct/all_bbox*100} %')
 
         cv.imshow('image', image)
-        key = cv.waitKey(0)
         detection_prev = detection[0].Bbox
         img_prev = image
         hist_prev = hist
 
-
-        if key == 27:
-            break
+        # key = cv.waitKey(0)
+        # if key == 27:
+        #     break
 
 
 
