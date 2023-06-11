@@ -1,9 +1,4 @@
 import numpy as np
-import pgmpy
-import itertools
-from pgmpy.models import MarkovModel
-from pgmpy.factors.discrete import DiscreteFactor
-from pgmpy.inference import Mplp
 import os
 from collections import namedtuple
 import cv2 as cv
@@ -15,17 +10,16 @@ Detection = namedtuple("Detection", ["image_path", "num", "Bbox"])
 
 # metoda działa jedynie dla Bboxów blisko siebie
 def bb_intersection_over_union(bbox1, bbox2):
-    # determine the (x, y)-coordinates of the intersection rectangle
+    # Określa współrzędne Bboxów z danych
     x1_min, y1_min, x1_max, y1_max = bbox1[0], bbox1[1], bbox1[0] + bbox1[2], bbox1[1] + bbox1[3]
     x2_min, y2_min, x2_max, y2_max = bbox2[0], bbox2[1], bbox2[0] + bbox2[2], bbox2[1] + bbox2[3]
-
-    # Oblicz wspólne obszary (intersection)
+    # Współrzędne Bboxów  między sobą
     x_inter_min = max(x1_min, x2_min)
     y_inter_min = max(y1_min, y2_min)
     x_inter_max = min(x1_max, x2_max)
     y_inter_max = min(y1_max, y2_max)
 
-    # compute the area of intersection rectangle
+    # Oblicza maksymalną wartość pola
     intersection_area = max(0, x_inter_max - x_inter_min) * max(0, y_inter_max - y_inter_min)
 
     # Oblicz pola powierzchni obu bounding boxów
@@ -34,54 +28,52 @@ def bb_intersection_over_union(bbox1, bbox2):
 
     # Oblicz IoU
     iou = intersection_area / float(bbox1_area + bbox2_area - intersection_area)
-
     return iou
 
 
-def description(bbox1, bbox2):
-    pass
-
-
+# Funkcja oblicza histogram z jednego Bboxa
 def calculate_histogram(image, bbox):
-    # Wyciągnij obszar z obrazu na podstawie bounding boxa
+    # Zapisuje obszar Bboxa
     x, y, w, h = map(int, bbox)
     roi = image[y:y+h, x:x+w]
 
-    # Konwertuj obszar na przestrzeń barw HSV
+    # Konwertuje obszar na przestrzeń barw HSV
     hsv_roi = cv.cvtColor(roi, cv.COLOR_BGR2HSV)
 
-    # Oblicz histogram kolorów w przestrzeni HSV
+    # Oblicza histogram kolorów w przestrzeni HSV
     hist = cv.calcHist([hsv_roi], [0, 1, 2], None, [8, 8, 8], [0, 256, 0, 256, 0, 256])
 
-    # Znormalizuj histogram
+    # Normalizuje histogram i zwraca wartość
     cv.normalize(hist, hist, 0, 255, cv.NORM_MINMAX)
 
     return hist.flatten()
 
 
+# Funkcja wczytująca dane Bounding boxów z pliku .txt
 def load_bboxes(image_dir, image_path):
     detections = []
-    with open("bboxes.txt", "r") as file:
+    with open("bboxes.txt", "r") as file:                       # Wczytanie pliku
         lines = file.readlines()
         line_index = 0
-        while line_index < len(lines):
-            current_image_name = lines[line_index].strip()
+        while line_index < len(lines):                           # Zapis indeksów linii w pliku
+            current_image_name = lines[line_index].strip()       #
             curr_image_dir = os.path.join(image_dir, current_image_name)
-            if str(curr_image_dir) == str(image_path):
-                num = int(lines[line_index + 1])                 # Bboxes number
-                Bboxes = []                                      # empty Bbox list
-                for _ in range(num):
+            if str(curr_image_dir) == str(image_path):           # Pobranie danych z aktualnie przetwarzanego zdjęcia
+                num = int(lines[line_index + 1])                 # Ilość Bboxów na zdjęciu
+                Bboxes = []
+                for _ in range(num):                             # Dla każdego Bboxa zapisuje współrzędne w liście
                     bbox_str = lines[line_index + 2]
                     bbox = list(map(float, bbox_str.strip().split()))
                     Bboxes.append(bbox)
                     line_index += 1
-                detections.append(Detection(image_path, num, Bboxes))
+                detections.append(Detection(image_path, num, Bboxes))   # Zapisuje w liście Bboxy jako obiekty Detection
                 break
             else:
                 line_index += 1
-    return detections
+    return detections  # Zwraca listę obiektów
 
 
+# Funkcja wczytująca jedynie 1 wartość z pliku Ground truth do porównania skuteczności algorytmu
 def load_gt(image_dir, image_path):
     with open("bboxes_gt.txt", "r") as file:
         lines = file.readlines()
@@ -91,45 +83,14 @@ def load_gt(image_dir, image_path):
             curr_image_dir = os.path.join(image_dir, current_image_name)
             if str(curr_image_dir) == str(image_path):
                 GT = []
-                num = int(lines[line_index + 1])  # number of Bboxes
+                num = int(lines[line_index + 1])
                 for i in range(num):
                     value = lines[line_index+2].split()
                     GT.append(int(value[0]))
                     line_index += 1
             else:
                 line_index += 1
-    return GT
-
-
-def create_factor(var_names, var_vals, params, feats, obs):
-
-    # shape of the values array
-    f_vals_shape = [len(vals) for vals in var_vals]
-    # list of values, will be reshaped later
-    f_vals = []
-    # for all combinations of variables values
-    for vals in itertools.product(*var_vals):
-        # value for current combination
-        cur_f_val = 0
-        # for each feature
-        for fi, cur_feat in enumerate(feats):
-            # value of feature multipled by parameter value
-            cur_f_val += params[fi] * cur_feat(*vals, obs)
-        f_vals.append(np.exp(cur_f_val))
-    # reshape values array
-    f_vals = np.array(f_vals)
-    f_vals = f_vals.reshape(f_vals_shape)
-
-    return DiscreteFactor(var_names, f_vals_shape, f_vals)
-
-
-def pairwise_feat(xi, xj, obs):
-    # 1 if the same, 0 otherwise
-    if xi == xj:
-        val = 1
-    else:
-        val = 0
-    return val
+    return GT                       # Zwraca wartości poprawnej klasyfikacji osób w liście
 
 
 def main():
@@ -137,10 +98,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('images_dir', type=str)
     args = parser.parse_args()
-    images_dir = Path(args.images_dir)
+    images_dir = Path(args.images_dir)               # Wczytanie ścieśki do zdjęć z podanego argumentu
     images_paths = sorted([image_path for image_path in images_dir.iterdir() if image_path.name.endswith('.jpg')])
-    detection_prev = []
-    hist_prev = []
+    detection_prev = []     # Sortowanie zdjęć alfabetycznie, inicjacja pustych list i zmiennych
     hist = []
     first_frame = True
     all_bbox = 0
@@ -150,39 +110,37 @@ def main():
 
         image = cv.imread(str(image_path))
         if image is None:
-            print(f'Error loading image {image_path}')
+            # print(f'Error loading image {image_path}')
             continue
 
-        detection = load_bboxes(images_dir,image_path)
-        hist_prev = hist.copy()
-        hist = []
+        detection = load_bboxes(images_dir,image_path)      # Dla każdego zdjęcia wczytuje Bboxy jako obiekty i dodaje je do listy Bboxów
+        hist_prev = hist.copy()     # Lista histogramów z poprzedniej klatki
+        hist = []   # Lista histogramów w obecnej klatce
         results = []
         # print(detection)
-        iou = []
-        center = []
-        center_prev = []
-        distance = []
-        matrix = - np.ones((len(detection[0].Bbox), len(detection_prev)))
-        for box in detection[0].Bbox:
-            x, y, w, h = box[0], box[1], box[2], box[3]
+        iou = []    # Lista wartości IoU
+        center = []          # Lista współrzędnych środka Bboxów w obecnej klatce
+        center_prev = []     # Lista współrzędnych środka Bboxów w poprzedniej klatce
+        distance = []        # Lista odległości pomiędzy Bboxami
+        matrix = - np.ones((len(detection[0].Bbox), len(detection_prev)))   # Inicjacja pustej macierzy tranzycji
+        for box in detection[0].Bbox:                       # W obecnej klatce obliczane są histogramy dla każdego Bboxa
+            x, y, w, h = box[0], box[1], box[2], box[3]     # oraz wyznaczane są środki Bboxów
             # print(x, y, w, h)
             center.append([x+0.5*w, y+0.5*h])
             cv.rectangle(image, (int(x), int(y)), (int(x)+int(w), int(y)+int(h)), (0, 255, 0), 2)
-            hist.append(calculate_histogram(image, box))            # Histogram aktualnej klatki
-
+            hist.append(calculate_histogram(image, box))            # Histogramy z aktualnej klatki
 
         matching_indices = []  # Indeksy dopasowanych elementów w macierzy
 
-        if first_frame:
-            # initialize previous detections and histograms
+        if first_frame:        # Wyznaczanie wartości dla pierwszej klatki
             detection_prev = detection[0].Bbox
             hist_prev.append(calculate_histogram(image, detection[0].Bbox[0]))
             img_prev = image
             first_frame = False
             matching_indices = [-1]
-            print(" ".join(map(str, matching_indices)) + "\n")  # Wyświetlenie końcowego wyniku w poprawnym formacie
+            print(" ".join(map(str, matching_indices)) + "\n")  # Wyświetlenie pierwszego wyniku w poprawnym formacie
 
-        else:
+        else:   # Śledzenie przechodniów dla pozostałych zdjęć
 
             for box_p in detection_prev:
                 xx, yy, ww, hh = box_p[0], box_p[1], box_p[2], box_p[3]
@@ -190,104 +148,50 @@ def main():
                 hist_prev.append(calculate_histogram(img_prev, box_p))  # Histogram poprzedniej klatki
                 center_prev.append([xx+0.5*ww, yy+0.5*hh])
 
-            #print(hist)
-            #print(hist_prev)
-            #print(results)
-            #
-            # nodes = []  # bounding boxy
-            # for prev in range(len(images_paths)):
-            #     for now in range(len(images_paths)):
-            #         nodes.append('x_' + str(prev) + '_' + str(now))
-            #
-            #
-            # factors_p = []  # prawdopodobieństwo z porównania histogramów
-            # edges_p = []  # Krawędzie między node ami
-            # for prev in range(len(detection_prev)):
-            #     for now in range(len(detection[0].Bbox)):
-            #         cur_f_r = create_factor(['x_' + str(prev) + '_' + str(now), 'x_' + str(prev + 1) + '_' + str(now)],
-            #                                 [[0, 1], [0, 1]],
-            #                                 [0.5],
-            #                                 [pairwise_feat],
-            #                                 None)
-            #         factors_p.append(cur_f_r)
-            #         edges_p.append(('x_' + str(prev) + '_' + str(now), 'x_' + str(prev + 1) + '_' + str(now)))
-            #
-            #
 
-            # factors_u = []
-            # for r in range(detection[0].num):
-            #         cur_f = create_factor(['x_' + str(r) + '_'],
-            #                               [[0, 1]],
-            #                               [1.0],
-            #                               [pairwise_feat],
-            #                               intensity[r, c])
-            #         factors_u.append(cur_f)
-            #
-            #
-            #
-            #
-            # G = MarkovModel()
-            # G.add_nodes_from(nodes)
-            # print('Adding factors_u')
-            # G.add_factors(*factors_u)
-            # print('Adding factors_p')
-            # G.add_factors(*factors_p)
-            # print('Adding edges')
-            # G.add_edges_from(edges_p)
-
-            # checking if everthing is ok
-            # print('Check model :', G.check_model())
-            #
-            # # initialize inference algorithm
-            # denoise_infer = Mplp(G)
-            #
-            # # inferring MAP assignment
-            # q = denoise_infer.map_query()
-
-            #print(len(detection[0].Bbox))
-            #print(len(detection_prev))
-
-            for i, now in enumerate(detection[0].Bbox):
-                for j, prev in enumerate(detection_prev):
-                    print(now)
-                    if j < len(hist_prev) and i < len(hist):
-                        result = cv.compareHist(hist_prev[j], hist[i], cv.HISTCMP_CORREL)
-                        distance.append(np.sqrt((center_prev[j][0]-center[i][0])**2 + (center_prev[j][0]-center[i][1])**2))
-                        print(distance)
+            # TWORZENIE MACIERZY
+            for i, now in enumerate(detection[0].Bbox):     # Wierszami są obecne Bboxy
+                for j, prev in enumerate(detection_prev):   # Kolumnami sa poprzednie Bboxy
+                    # print(now)
+                    if j < len(hist_prev) and i < len(hist):   # Obliczenia wartości dla i*j Bboxów
+                        result = cv.compareHist(hist_prev[j], hist[i], cv.HISTCMP_CORREL)   # Wartość prawdopodobieństwa obliczona z porównania histogramów z klatki t-1 i t
+                        distance.append(np.sqrt((center_prev[j][0]-center[i][0])**2 + (center_prev[j][0]-center[i][1])**2)) # Obliczanie dystansu między Bboxami w 2 kolejnych klatkach
+                        # print(distance)
 
                     else:
-                        result = -1
-                    matrix[i, j] = result
+                        result = -1         # Wypełnienie reszty macierzy wartościami -1
+                    matrix[i, j] = result    # Zapis wartości przawdopodobieństwa w komórkach odpowiadających numerom wierszy i kolumn
 
+            # GREEDY SEARCH
             for i in range(len(matrix)):
                 row = matrix[i]
                 max_value = max(row)  # Znajdowanie największej wartości w wierszu
                 max_index = np.where(row == max_value)[0][0]  # Indeks największej wartości
-                if max_value < 0.65 or distance[i] > 500:
+                if max_value < 0.65 or distance[i] > 500:     # Jeśli dystans między Bboxami jest zbyt duży to jest to nowa osoba
                     max_index = -1
                 matching_indices.append(max_index)              # Wartości wyjściowe poszczególnych Bboxów
 
             gt = load_gt(images_dir, image_path)                # Metryka poprawnych dopasowań
             all_bbox += len(gt)
             for i in range(len(matching_indices)):
-                print(f'gti{gt[i]}, matching_i {matching_indices[i]}')
-                if gt[i] == matching_indices[i]:
+                # print(f'gti{gt[i]}, matching_i {matching_indices[i]}')
+                if gt[i] == matching_indices[i]:               # Porównanie dopasowania do wartości z pliku Ground Truth
                     correct += 1
 
 
-            print("MATRIX")
-            #print(matrix)
-            #print(image_path)
-            print(f'GT: {gt}, ALL: {all_bbox}, CORRECT: {correct}')
+            # print("MATRIX")
+            # print(matrix)
+            # print(image_path)
+            # print(f'GT: {gt}, ALL: {all_bbox}, CORRECT: {correct}')
             print(" ".join(map(str, matching_indices))+"\n")        # Wyświetlenie końcowego wyniku w poprawnym formacie
-            print(f'Correct percentage: {correct/all_bbox*100} %')
+            # print(f'Correct percentage: {correct/all_bbox*100} %')
 
-        cv.imshow('image', image)
-        detection_prev = detection[0].Bbox
+        cv.imshow('image', image)           # Wyświetlenie zdjęcia z narysowanymi Bboxami
+        detection_prev = detection[0].Bbox  # Podstawienie wartości z obecnej klatki jako wartości poprzedniej
         img_prev = image
         hist_prev = hist
 
-        # key = cv.waitKey(0)
+        # key = cv.waitKey(0)   # oczekiwanie na wciśnięcie klawisza (w trakcie testów)
         # if key == 27:
         #     break
 
