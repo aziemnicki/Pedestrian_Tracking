@@ -112,9 +112,8 @@ def main():
     args = parser.parse_args()
 
     # Wczytanie ścieśki do zdjęć z podanego argumentu
-    images_dir = Path(args.images_dir)
+    images_dir = Path(args.images_dir+'/frames/')
     images_paths = sorted([image_path for image_path in images_dir.iterdir() if image_path.name.endswith('.jpg')])
-
     # Sortowanie zdjęć alfabetycznie, inicjacja pustych list i zmiennych
     detection_prev = []
     hist = []
