@@ -84,26 +84,26 @@ def load_bboxes(image_dir, image_path):
     return detections
 
 
-# Funkcja wczytująca jedynie 1 wartość z pliku Ground truth do porównania skuteczności algorytmu
-def load_gt(image_dir, image_path):
-    with open("bboxes_gt.txt", "r") as file:
-        lines = file.readlines()
-        line_index = 0
-        while line_index < len(lines):
-            current_image_name = lines[line_index].strip()
-            curr_image_dir = os.path.join(image_dir, current_image_name)
-            if str(curr_image_dir) == str(image_path):
-                GT = []
-                num = int(lines[line_index + 1])
-                for i in range(num):
-                    value = lines[line_index + 2].split()
-                    GT.append(int(value[0]))
-                    line_index += 1
-            else:
-                line_index += 1
-
-    # Zwraca wartości poprawnej klasyfikacji osób w liście
-    return GT
+# # Funkcja wczytująca jedynie 1 wartość z pliku Ground truth do porównania skuteczności algorytmu
+# def load_gt(image_dir, image_path):
+#     with open("bboxes_gt.txt", "r") as file:
+#         lines = file.readlines()
+#         line_index = 0
+#         while line_index < len(lines):
+#             current_image_name = lines[line_index].strip()
+#             curr_image_dir = os.path.join(image_dir, current_image_name)
+#             if str(curr_image_dir) == str(image_path):
+#                 GT = []
+#                 num = int(lines[line_index + 1])
+#                 for i in range(num):
+#                     value = lines[line_index + 2].split()
+#                     GT.append(int(value[0]))
+#                     line_index += 1
+#             else:
+#                 line_index += 1
+#
+#     # Zwraca wartości poprawnej klasyfikacji osób w liście
+#     return GT
 
 
 def main():
@@ -213,12 +213,12 @@ def main():
 
 
             # Metryka poprawnych dopasowań
-            gt = load_gt(images_dir, image_path)
-            all_bbox += len(gt)
-            for i in range(len(matching_indices)):
-                # Porównanie dopasowania do wartości z pliku Ground Truth
-                if gt[i] == matching_indices[i]:
-                    correct += 1
+            # gt = load_gt(images_dir, image_path)
+            # all_bbox += len(gt)
+            # for i in range(len(matching_indices)):
+            #     # Porównanie dopasowania do wartości z pliku Ground Truth
+            #     if gt[i] == matching_indices[i]:
+            #         correct += 1
 
             # print("MATRIX")
             # print(matrix)
