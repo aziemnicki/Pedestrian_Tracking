@@ -164,7 +164,7 @@ def main():
             matching_indices = [-1]
 
             # Wyświetlenie pierwszego wyniku w poprawnym formacie
-            print(" ".join(map(str, matching_indices)) + "\n")
+            print(" ".join(map(str, matching_indices)) )
 
         # Śledzenie przechodniów dla pozostałych zdjęć
         else:
@@ -226,7 +226,7 @@ def main():
             # print(f'GT: {gt}, ALL: {all_bbox}, CORRECT: {correct}')
 
             # Wyświetlenie końcowego wyniku w poprawnym formacie
-            print(" ".join(map(str, matching_indices)) + "\n")
+            print(" ".join(map(str, matching_indices)))
             # print(f'Correct percentage: {correct/all_bbox*100} %')
 
 
